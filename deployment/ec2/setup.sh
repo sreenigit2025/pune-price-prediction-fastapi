@@ -1,16 +1,16 @@
 #!/bin/bash
 #
 # Pune Property Price Prediction - EC2 Deployment Setup Script
-# This script automates the deployment on AWS EC2 Ubuntu 24.04 LTS
+# This script automates the deployment on AWS EC2 Ubuntu (24.04 / 26.04 LTS)
 #
 # Usage: sudo ./setup.sh
 #
 
 set -e  # Exit on error
 
-# --- Ubuntu 24.04 LTS non-interactive apt settings ---
-# 24.04 ships `needrestart` by default which prompts during apt operations and
-# breaks automated installs. Suppress all interactive prompts for this session.
+# --- Non-interactive apt settings ---
+# Modern Ubuntu ships `needrestart` by default which prompts during apt
+# operations and breaks automated installs. Suppress all interactive prompts.
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a       # automatically restart services
 export NEEDRESTART_SUSPEND=1    # don't interrupt apt with the TUI prompt
@@ -20,7 +20,7 @@ APT_OPTS=(-y \
 
 echo "=========================================="
 echo "Pune Price Prediction - EC2 Setup"
-echo "Target OS: Ubuntu 24.04 LTS (Noble Numbat)"
+echo "Target OS: Ubuntu 24.04 / 26.04 LTS"
 echo "=========================================="
 
 # Colors for output
@@ -57,12 +57,14 @@ apt-get "${APT_OPTS[@]}" upgrade
 print_success "System updated"
 
 # Install dependencies
-# Note: Ubuntu 24.04 ships Python 3.12 as the default `python3`, so most of
-# these are already present — apt-get will be a no-op for those.
+# Note: We use the distro's default `python3` rather than pinning to a
+# specific minor version (e.g. python3.12). Ubuntu 24.04 ships 3.12,
+# Ubuntu 26.04 ships a newer version — both work fine for this app.
 print_info "Installing system dependencies..."
 apt-get "${APT_OPTS[@]}" install \
-    python3.12 \
-    python3.12-venv \
+    python3 \
+    python3-venv \
+    python3-dev \
     python3-pip \
     nginx \
     git \
@@ -71,6 +73,10 @@ apt-get "${APT_OPTS[@]}" install \
     certbot \
     python3-certbot-nginx
 print_success "Dependencies installed"
+
+# Show which Python we ended up with (useful for debugging)
+PY_VERSION=$(python3 --version)
+print_info "Using ${PY_VERSION}"
 
 # Application directory
 APP_DIR="/home/ubuntu/pune-price-prediction-fastapi"
@@ -89,7 +95,7 @@ cd "$APP_DIR"
 
 # Create virtual environment as the ubuntu user
 print_info "Creating Python virtual environment..."
-sudo -u ubuntu python3.12 -m venv .venv
+sudo -u ubuntu python3 -m venv .venv
 print_success "Virtual environment created"
 
 # Install Python dependencies
@@ -159,7 +165,7 @@ echo "2. View logs:    sudo journalctl -u pune-price-prediction -f"
 echo "3. Test health:  curl http://localhost:8000/health"
 echo ""
 
-# Use IMDSv2 (token-based) — required on most new EC2 AMIs (Ubuntu 24.04
+# Use IMDSv2 (token-based) — required on most new EC2 AMIs (modern Ubuntu
 # launches usually default to IMDSv2-only, where IMDSv1 calls return 401).
 IMDS_TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" \
     -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
